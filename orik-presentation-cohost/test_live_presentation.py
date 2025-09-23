@@ -8,6 +8,7 @@ import sys
 import asyncio
 import time
 from pathlib import Path
+from datetime import datetime
 
 # Add src to path
 sys.path.append(str(Path(__file__).parent / "src"))
@@ -16,6 +17,7 @@ from src.mcp_tools.speaker_notes_tool import SpeakerNotesTool
 from src.mcp_tools.text_to_speech_tool import TextToSpeechTool
 from src.mcp_tools.dig_at_aaron_tool import DigAtAaronTool
 from src.ui.orik_avatar_ui import OrikAvatarUI, WindowConfig
+from src.agents.orik_personality_agent import OrikPersonalityAgent
 
 
 class LiveOrikDemo:
@@ -25,6 +27,7 @@ class LiveOrikDemo:
         self.speaker_notes_tool = SpeakerNotesTool()
         self.tts_tool = TextToSpeechTool()
         self.dig_tool = DigAtAaronTool()
+        self.orik_agent = OrikPersonalityAgent()  # New Bedrock-powered agent
         self.avatar_ui = None
         self.running = False
         self.last_slide_index = -1
@@ -103,21 +106,76 @@ class LiveOrikDemo:
             for i, tag in enumerate(extracted_tags, 1):
                 print(f"   Tag {i}: {tag[:50]}...")
             
-            # Use the first tag as context for response
+            # Use the first tag as context for AI-generated response
             context = extracted_tags[0]
-            response_text = f"Oh {context}? How... groundbreaking, Aaron."
+            print("🤖 Generating AI response with Bedrock...")
+            
+            try:
+                # Create slide data for context
+                from src.models.slide_data import SlideData
+                slide_context = SlideData(
+                    slide_index=slide_index,
+                    slide_title=slide_title,
+                    speaker_notes=speaker_notes,
+                    presentation_path="live_presentation",
+                    timestamp=datetime.now()
+                )
+                
+                # Generate dynamic response using Bedrock
+                response_result = await self.orik_agent.generate_response(
+                    context=context,
+                    slide_data=slide_context,
+                    response_type="tagged"
+                )
+                
+                if response_result.get('success'):
+                    response_text = response_result['response_text']
+                    model_used = response_result.get('model_used', 'unknown')
+                    confidence = response_result.get('confidence', 0.0)
+                    print(f"✨ AI Response generated (model: {model_used}, confidence: {confidence:.2f})")
+                else:
+                    response_text = f"Oh {context}? How... groundbreaking, Aaron."
+                    print("⚠️ AI generation failed, using fallback")
+                    
+            except Exception as e:
+                print(f"❌ AI generation error: {e}")
+                response_text = f"Oh {context}? How... groundbreaking, Aaron."
             
         else:
-            print("🤔 No [Orik] tags found, generating random dig...")
+            print("🤔 No [Orik] tags found, generating random AI dig...")
             
-            # Get a random dig at Aaron
             try:
-                dig_result = await self.dig_tool.get_aaron_dig()
-                if dig_result.get('success'):
-                    response_text = dig_result.get('dig', "Sure, Aaron. That's brilliant.")
+                # Generate random sarcastic response using AI
+                from src.models.slide_data import SlideData
+                slide_context = SlideData(
+                    slide_index=slide_index,
+                    slide_title=slide_title,
+                    speaker_notes=speaker_notes,
+                    presentation_path="live_presentation",
+                    timestamp=datetime.now()
+                )
+                
+                response_result = await self.orik_agent.generate_response(
+                    context=f"Slide about {slide_title}",
+                    slide_data=slide_context,
+                    response_type="random"
+                )
+                
+                if response_result.get('success'):
+                    response_text = response_result['response_text']
+                    model_used = response_result.get('model_used', 'unknown')
+                    print(f"✨ AI Random dig generated (model: {model_used})")
                 else:
-                    response_text = "Oh brilliant, Aaron. Just brilliant."
-            except:
+                    # Fallback to old dig tool
+                    dig_result = await self.dig_tool.get_aaron_dig()
+                    if dig_result.get('success'):
+                        response_text = dig_result.get('dig', "Sure, Aaron. That's brilliant.")
+                    else:
+                        response_text = "Oh brilliant, Aaron. Just brilliant."
+                    print("⚠️ Using fallback dig tool")
+                    
+            except Exception as e:
+                print(f"❌ AI dig generation error: {e}")
                 response_text = "Wow Aaron, groundbreaking insight."
         
         if response_text:
