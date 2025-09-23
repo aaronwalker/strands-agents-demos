@@ -1,0 +1,51 @@
+{
+  "orik_personality": {
+    "sarcasm_level": 0.8,
+    "interruption_frequency": 0.3,
+    "aaron_dig_probability": 0.4
+  },
+  "voice_config": {
+    "voice_id": "Matthew",
+    "speed": 1.1,
+    "pitch": "-10%",
+    "volume": 1.0,
+    "engine": "neural"
+  },
+  "presentation_monitor": {
+    "software_type": "powerpoint",
+    "polling_interval_ms": 500,
+    "auto_detect": true
+  },
+  "audio_playback": {
+    "device_id": null,
+    "buffer_size": 1024,
+    "sample_rate": 22050
+  },
+  "mcp_servers": {
+    "speaker_notes_tool": {
+      "host": "localhost",
+      "port": 8001
+    },
+    "dig_at_aaron_tool": {
+      "host": "localhost", 
+      "port": 8002
+    },
+    "text_to_speech_tool": {
+      "host": "localhost",
+      "port": 8003
+    }
+  },
+  "logging": {
+    "level": "INFO",
+    "log_file": "logs/orik.log",
+    "include_timestamp": true
+  },
+  "ui": {
+    "avatar_window": {
+      "width": 300,
+      "height": 400,
+      "always_on_top": true,
+      "transparent_background": true
+    }
+  }
+}

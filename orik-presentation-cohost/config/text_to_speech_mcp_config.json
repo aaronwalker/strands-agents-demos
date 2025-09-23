@@ -1,0 +1,22 @@
+{
+  "mcpServers": {
+    "text-to-speech-tool": {
+      "command": "python3",
+      "args": [
+        "src/mcp_tools/run_text_to_speech_server.py"
+      ],
+      "cwd": "orik-presentation-cohost",
+      "env": {
+        "AWS_REGION": "us-east-1",
+        "FASTMCP_LOG_LEVEL": "INFO"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "synthesize_speech",
+        "get_voice_config",
+        "test_tts_connection"
+      ],
+      "disabledTools": []
+    }
+  }
+}

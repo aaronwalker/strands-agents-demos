@@ -1,0 +1,19 @@
+{
+  "mcpServers": {
+    "speaker-notes-tool": {
+      "command": "python3",
+      "args": ["src/mcp_tools/run_speaker_notes_server.py"],
+      "cwd": ".",
+      "env": {
+        "PYTHONPATH": "src",
+        "LOG_LEVEL": "INFO"
+      },
+      "disabled": false,
+      "autoApprove": [
+        "extract_speaker_notes",
+        "get_current_slide_notes"
+      ],
+      "disabledTools": []
+    }
+  }
+}
