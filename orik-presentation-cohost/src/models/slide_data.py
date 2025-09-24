@@ -14,6 +14,7 @@ class SlideData:
     speaker_notes: str
     presentation_path: str
     timestamp: datetime
+    slide_content: Optional[str] = ""  # Content from slide text shapes
     
     def __post_init__(self):
         """Validate slide data after initialization."""
@@ -31,14 +32,22 @@ class SlideData:
         """Check if slide has speaker notes."""
         return bool(self.speaker_notes and self.speaker_notes.strip())
     
+    @property
+    def has_slide_content(self) -> bool:
+        """Check if slide has content."""
+        return bool(self.slide_content and self.slide_content.strip())
+    
     def to_dict(self) -> dict:
         """Convert to dictionary representation."""
         return {
             'slide_index': self.slide_index,
             'slide_title': self.slide_title,
             'speaker_notes': self.speaker_notes,
+            'slide_content': self.slide_content,
             'presentation_path': self.presentation_path,
-            'timestamp': self.timestamp.isoformat()
+            'timestamp': self.timestamp.isoformat(),
+            'has_speaker_notes': self.has_speaker_notes,
+            'has_slide_content': self.has_slide_content
         }
 
 

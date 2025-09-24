@@ -43,7 +43,7 @@ class SpeakerNotesExtractor:
             # For macOS, we'll use AppleScript to interact with PowerPoint
             import subprocess
             
-            # AppleScript to get slide information
+            # Enhanced AppleScript to get slide information including content
             applescript = f'''
             tell application "Microsoft PowerPoint"
                 if (count of presentations) > 0 then
@@ -51,11 +51,29 @@ class SpeakerNotesExtractor:
                     if {slide_index + 1} <= (count of slides of pres) then
                         set currentSlide to slide {slide_index + 1} of pres
                         set slideTitle to ""
+                        set slideContent to ""
                         set speakerNotes to ""
                         
                         -- Try to get slide title from first text shape
                         try
                             set slideTitle to content of text range of text frame of shape 1 of currentSlide
+                        end try
+                        
+                        -- Get slide content from all text shapes
+                        try
+                            set shapeCount to count of shapes of currentSlide
+                            repeat with i from 1 to shapeCount
+                                try
+                                    set shapeText to content of text range of text frame of shape i of currentSlide
+                                    if shapeText is not "" and shapeText is not slideTitle then
+                                        if slideContent is "" then
+                                            set slideContent to shapeText
+                                        else
+                                            set slideContent to slideContent & " " & shapeText
+                                        end if
+                                    end if
+                                end try
+                            end repeat
                         end try
                         
                         -- Get speaker notes (usually in shape 2 of notes page)
@@ -70,7 +88,7 @@ class SpeakerNotesExtractor:
                             set speakerNotes to ""
                         end try
                         
-                        return slideTitle & "|||" & speakerNotes
+                        return slideTitle & "|||" & slideContent & "|||" & speakerNotes
                     else
                         return "ERROR: Slide index out of range"
                     end if
@@ -99,12 +117,23 @@ class SpeakerNotesExtractor:
             
             parts = output.split("|||")
             slide_title = parts[0] if len(parts) > 0 else ""
-            speaker_notes = parts[1] if len(parts) > 1 else ""
+            slide_content = parts[1] if len(parts) > 1 else ""
+            speaker_notes = parts[2] if len(parts) > 2 else ""
             
+            # Clean up "missing value" responses
+            if slide_title == "missing value":
+                slide_title = f"Slide {slide_index + 1}"
+            if slide_content == "missing value":
+                slide_content = ""
+            if speaker_notes == "missing value":
+                speaker_notes = ""
+            
+            # Create SlideData with enhanced content
             return SlideData(
                 slide_index=slide_index,
                 slide_title=slide_title,
                 speaker_notes=speaker_notes,
+                slide_content=slide_content,
                 presentation_path=presentation_path,
                 timestamp=datetime.now()
             )

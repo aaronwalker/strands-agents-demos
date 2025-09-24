@@ -211,7 +211,7 @@ Remember: You're sarcastic but not cruel. Your goal is to add humor to presentat
                 return result
             else:
                 # Fallback to template response
-                fallback_result = self._generate_fallback_response(context, response_type)
+                fallback_result = self._generate_fallback_response(context, response_type, slide_data)
                 
                 # Add fallback to conversation history too
                 if fallback_result.get('success'):
@@ -226,7 +226,7 @@ Remember: You're sarcastic but not cruel. Your goal is to add humor to presentat
                 
         except Exception as e:
             logger.error(f"Error generating response: {e}")
-            fallback_result = self._generate_fallback_response(context, response_type)
+            fallback_result = self._generate_fallback_response(context, response_type, slide_data)
             
             # Add fallback to conversation history
             if fallback_result.get('success'):
@@ -258,14 +258,19 @@ Remember: You're sarcastic but not cruel. Your goal is to add humor to presentat
                 prompt += f"- Your response: {entry['response']}\n"
             prompt += "\n"
         
-        # Add current context
+        # Add current context with enhanced slide information
         if response_type == "tagged":
             prompt += f"CURRENT SITUATION:\n"
             prompt += f"Aaron's speaker note says: '{context}'\n"
             if slide_data:
                 prompt += f"Slide title: '{slide_data.slide_title}'\n"
                 prompt += f"This is slide {slide_data.slide_index + 1}\n"
-            prompt += "\nGenerate a sarcastic response to this speaker note. Make it witty and brief.\n"
+                if slide_data.slide_content and slide_data.slide_content.strip():
+                    # Use more slide content for better context
+                    content_preview = slide_data.slide_content[:400] if len(slide_data.slide_content) > 400 else slide_data.slide_content
+                    prompt += f"Slide content: '{content_preview}'\n"
+                    prompt += f"Use the slide content to make your sarcastic response more specific and clever.\n"
+            prompt += "\nGenerate a sarcastic response to this speaker note. Reference the slide content when possible to make targeted jokes. Make it witty and brief.\n"
             
         elif response_type == "random":
             prompt += f"CURRENT SITUATION:\n"
@@ -273,14 +278,26 @@ Remember: You're sarcastic but not cruel. Your goal is to add humor to presentat
             if slide_data:
                 prompt += f"Current slide: '{slide_data.slide_title}'\n"
                 prompt += f"This is slide {slide_data.slide_index + 1}\n"
-            prompt += "\nGenerate a random sarcastic dig at Aaron or his presentation. Be witty but not cruel.\n"
+                if slide_data.slide_content and slide_data.slide_content.strip():
+                    # Use more slide content for better random comments
+                    content_preview = slide_data.slide_content[:400] if len(slide_data.slide_content) > 400 else slide_data.slide_content
+                    prompt += f"Slide content: '{content_preview}'\n"
+                    prompt += f"Make sarcastic comments about the slide content, design, or Aaron's presentation style.\n"
+                else:
+                    prompt += f"No slide content available - focus on Aaron's presentation style or the slide title.\n"
+            prompt += "\nGenerate a random sarcastic dig at Aaron or his presentation. Use the slide content for specific, clever commentary when available. Be witty but not cruel.\n"
             
         else:  # contextual
             prompt += f"CURRENT SITUATION:\n"
             prompt += f"Context: {context}\n"
             if slide_data:
                 prompt += f"Slide: '{slide_data.slide_title}'\n"
-            prompt += "\nGenerate a contextual sarcastic response. Be clever and brief.\n"
+                if slide_data.slide_content and slide_data.slide_content.strip():
+                    # Use more slide content for contextual responses
+                    content_preview = slide_data.slide_content[:400] if len(slide_data.slide_content) > 400 else slide_data.slide_content
+                    prompt += f"Slide content: '{content_preview}'\n"
+                    prompt += f"Use the slide content to make contextually relevant sarcastic comments.\n"
+            prompt += "\nGenerate a contextual sarcastic response. Use the slide content to make more specific and clever comments about what Aaron is presenting. Be brief.\n"
         
         prompt += "\nRESPONSE (1-2 sentences max, stay in character as sarcastic Orik):"
         
@@ -371,29 +388,50 @@ Remember: You're sarcastic but not cruel. Your goal is to add humor to presentat
         
         return response
     
-    def _generate_fallback_response(self, context: str, response_type: str) -> Dict[str, Any]:
+    def _generate_fallback_response(self, context: str, response_type: str, slide_data: Optional[SlideData] = None) -> Dict[str, Any]:
         """Generate a smart fallback response when Bedrock is unavailable."""
         import random
         
         # Context-aware response generation
         context_lower = context.lower()
+        slide_content_lower = ""
+        
+        # Extract slide content for analysis
+        if slide_data and slide_data.slide_content:
+            slide_content_lower = slide_data.slide_content.lower()
         
         if response_type == "tagged":
-            # Analyze context for better responses
+            # Analyze context and slide content for better responses
             if any(word in context_lower for word in ['demo', 'test', 'try', 'see if']):
-                responses = [
-                    f"Oh, {context[:35]}? I'm sure this will go perfectly.",
-                    f"Let me guess, {context[:35]}? What could possibly go wrong?",
-                    f"Ah yes, {context[:35]}. Aaron's famous last words.",
-                    f"Sure, {context[:35]}. Because Aaron's demos always work flawlessly."
-                ]
+                if slide_data and slide_data.slide_content:
+                    responses = [
+                        f"Oh, {context[:35]}? With this slide content? I'm sure this will go perfectly.",
+                        f"Let me guess, {context[:35]}? Looking at this slide, what could possibly go wrong?",
+                        f"Ah yes, {context[:35]}. Aaron's famous last words, especially with '{slide_data.slide_title}'.",
+                        f"Sure, {context[:35]}. Because Aaron's demos always work flawlessly."
+                    ]
+                else:
+                    responses = [
+                        f"Oh, {context[:35]}? I'm sure this will go perfectly.",
+                        f"Let me guess, {context[:35]}? What could possibly go wrong?",
+                        f"Ah yes, {context[:35]}. Aaron's famous last words.",
+                        f"Sure, {context[:35]}. Because Aaron's demos always work flawlessly."
+                    ]
             elif any(word in context_lower for word in ['explain', 'show', 'tell', 'teach']):
-                responses = [
-                    f"Oh brilliant, {context[:35]}? I'm sure everyone will understand perfectly.",
-                    f"Fascinating, {context[:35]}. Aaron's explanations are always so... clear.",
-                    f"Let me guess, {context[:35]}? This should be enlightening.",
-                    f"Wonderful, {context[:35]}. Aaron's teaching style is truly... unique."
-                ]
+                if slide_data and slide_data.slide_content:
+                    responses = [
+                        f"Oh brilliant, {context[:35]}? Looking at '{slide_data.slide_title}', I'm sure everyone will understand perfectly.",
+                        f"Fascinating, {context[:35]}. Aaron's explanations are always so... clear, especially with this slide.",
+                        f"Let me guess, {context[:35]}? This should be enlightening.",
+                        f"Wonderful, {context[:35]}. Aaron's teaching style with '{slide_data.slide_title}' is truly... unique."
+                    ]
+                else:
+                    responses = [
+                        f"Oh brilliant, {context[:35]}? I'm sure everyone will understand perfectly.",
+                        f"Fascinating, {context[:35]}. Aaron's explanations are always so... clear.",
+                        f"Let me guess, {context[:35]}? This should be enlightening.",
+                        f"Wonderful, {context[:35]}. Aaron's teaching style is truly... unique."
+                    ]
             elif any(word in context_lower for word in ['complex', 'difficult', 'hard', 'advanced']):
                 responses = [
                     f"Oh, {context[:35]}? Because Aaron loves overcomplicating things.",
@@ -402,42 +440,128 @@ Remember: You're sarcastic but not cruel. Your goal is to add humor to presentat
                     f"Brilliant, {context[:35]}. Aaron's about to confuse everyone."
                 ]
             else:
-                # Generic sarcastic responses
-                responses = [
-                    f"Oh {context[:35]}? How... groundbreaking, Aaron.",
-                    f"Sure, {context[:35]}. That's brilliant.",
-                    f"Fascinating insight: {context[:35]}... truly revolutionary.",
-                    f"Let me guess, {context[:35]}? How original.",
-                    f"Ah yes, {context[:35]}. Because that's not obvious at all."
-                ]
+                # Generic sarcastic responses with slide context when available
+                if slide_data and slide_data.slide_content:
+                    # Check slide content for specific topics to mock
+                    if any(word in slide_content_lower for word in ['bullet', 'point', 'list']) or '•' in slide_data.slide_content or '-' in slide_data.slide_content:
+                        responses = [
+                            f"Oh {context[:35]}? More bullet points, how... groundbreaking, Aaron.",
+                            f"Sure, {context[:35]}. Nothing says 'engaging presentation' like bullet points.",
+                            f"Fascinating insight: {context[:35]}... and more bullet points. Revolutionary."
+                        ]
+                    elif any(word in slide_content_lower for word in ['diagram', 'chart', 'graph']):
+                        responses = [
+                            f"Oh {context[:35]}? Another diagram to confuse everyone, brilliant.",
+                            f"Sure, {context[:35]}. Because that diagram makes everything crystal clear.",
+                            f"Ah yes, {context[:35]}. Nothing like a good chart to lose the audience."
+                        ]
+                    elif any(word in slide_content_lower for word in ['aws', 'cloud', 'service']):
+                        responses = [
+                            f"Oh {context[:35]}? More AWS buzzword bingo, how original.",
+                            f"Sure, {context[:35]}. Another cloud service to solve all problems.",
+                            f"Fascinating: {context[:35]}... because we needed more AWS services."
+                        ]
+                    else:
+                        responses = [
+                            f"Oh {context[:35]}? How... groundbreaking, Aaron.",
+                            f"Sure, {context[:35]}. That's brilliant.",
+                            f"Fascinating insight: {context[:35]}... truly revolutionary.",
+                            f"Let me guess, {context[:35]}? How original."
+                        ]
+                else:
+                    responses = [
+                        f"Oh {context[:35]}? How... groundbreaking, Aaron.",
+                        f"Sure, {context[:35]}. That's brilliant.",
+                        f"Fascinating insight: {context[:35]}... truly revolutionary.",
+                        f"Let me guess, {context[:35]}? How original.",
+                        f"Ah yes, {context[:35]}. Because that's not obvious at all."
+                    ]
             
             response_text = random.choice(responses)
             
         elif response_type == "random":
-            # Categorized random responses
-            presentation_skills = [
-                "Oh brilliant, Aaron. Just brilliant.",
-                "Sure, let's all pretend Aaron rehearsed this part.",
-                "Aaron's presentation skills are truly... something.",
-                "Nothing says 'professional presenter' like Aaron's deer-in-headlights look.",
-                "I love how Aaron makes every slide transition feel like a surprise to him too."
-            ]
-            
-            content_quality = [
-                "Wow Aaron, groundbreaking insight... from 2012.",
-                "I'm sure the audience is hanging on Aaron's every word.",
-                "Another slide where Aaron proves bullet points are a design choice.",
-                "I see Aaron went with the 'wall of text' approach again.",
-                "Aaron's slide design aesthetic: 'More is definitely more'."
-            ]
-            
-            technical_competence = [
-                "I love how Aaron makes complex topics sound... confusing.",
-                "Aaron's technical depth is about as shallow as a puddle.",
-                "I'm sure Aaron totally understands what he just said.",
-                "Aaron's explaining this like he learned it five minutes ago.",
-                "That's some cutting-edge technology there, Aaron... if this were 2010."
-            ]
+            # Categorized random responses with slide content awareness
+            if slide_data and slide_data.slide_content:
+                # Content-aware responses based on slide content
+                if any(word in slide_content_lower for word in ['bullet', 'point', 'list']) or '•' in slide_data.slide_content or '-' in slide_data.slide_content:
+                    content_quality = [
+                        f"Another slide where Aaron proves bullet points are a design choice.",
+                        f"I see Aaron went with the 'wall of bullet points' approach for '{slide_data.slide_title}'.",
+                        f"Aaron's slide design aesthetic: 'More bullet points is definitely more'.",
+                        f"Oh look, more bullet points. How... creative, Aaron."
+                    ]
+                elif any(word in slide_content_lower for word in ['diagram', 'chart', 'graph', 'image']):
+                    content_quality = [
+                        f"I see Aaron found another diagram to confuse everyone with.",
+                        f"Aaron's visual aids are truly... something to behold.",
+                        f"Nothing says 'clear explanation' like Aaron's diagrams.",
+                        f"I love how Aaron's charts make everything crystal clear... not."
+                    ]
+                elif any(word in slide_content_lower for word in ['aws', 'cloud', 'lambda', 'ec2', 's3']):
+                    technical_competence = [
+                        f"More AWS buzzword bingo on '{slide_data.slide_title}'. How original.",
+                        f"Aaron's explaining AWS like he discovered it yesterday.",
+                        f"I'm sure Aaron totally understands all these AWS services he's mentioning.",
+                        f"That's some cutting-edge cloud technology there, Aaron... if this were 2015."
+                    ]
+                elif any(word in slide_content_lower for word in ['ai', 'machine learning', 'ml', 'artificial']):
+                    technical_competence = [
+                        f"Oh wonderful, Aaron's jumping on the AI bandwagon with '{slide_data.slide_title}'.",
+                        f"I'm sure Aaron's AI expertise runs deep... about as deep as a puddle.",
+                        f"Aaron explaining AI is like watching someone discover fire.",
+                        f"Let me guess, everything is 'powered by AI' now, Aaron?"
+                    ]
+                else:
+                    # Generic content-based responses
+                    content_quality = [
+                        f"Wow Aaron, groundbreaking insight on '{slide_data.slide_title}'... from 2012.",
+                        f"I'm sure the audience is hanging on Aaron's every word about '{slide_data.slide_title}'.",
+                        f"Aaron's slide design aesthetic for '{slide_data.slide_title}': 'More is definitely more'.",
+                        f"Another masterpiece slide from Aaron's design school."
+                    ]
+                
+                # Standard categories
+                presentation_skills = [
+                    "Oh brilliant, Aaron. Just brilliant.",
+                    "Sure, let's all pretend Aaron rehearsed this part.",
+                    "Aaron's presentation skills are truly... something.",
+                    "Nothing says 'professional presenter' like Aaron's deer-in-headlights look.",
+                    "I love how Aaron makes every slide transition feel like a surprise to him too."
+                ]
+                
+                technical_competence = technical_competence if 'technical_competence' in locals() else [
+                    "I love how Aaron makes complex topics sound... confusing.",
+                    "Aaron's technical depth is about as shallow as a puddle.",
+                    "I'm sure Aaron totally understands what he just said.",
+                    "Aaron's explaining this like he learned it five minutes ago.",
+                    "That's some cutting-edge technology there, Aaron... if this were 2010."
+                ]
+                
+            else:
+                # Standard responses when no slide content
+                presentation_skills = [
+                    "Oh brilliant, Aaron. Just brilliant.",
+                    "Sure, let's all pretend Aaron rehearsed this part.",
+                    "Aaron's presentation skills are truly... something.",
+                    "Nothing says 'professional presenter' like Aaron's deer-in-headlights look.",
+                    "I love how Aaron makes every slide transition feel like a surprise to him too."
+                ]
+                
+                content_quality = [
+                    "Wow Aaron, groundbreaking insight... from 2012.",
+                    "I'm sure the audience is hanging on Aaron's every word.",
+                    "Another slide where Aaron proves bullet points are a design choice.",
+                    "I see Aaron went with the 'wall of text' approach again.",
+                    "Aaron's slide design aesthetic: 'More is definitely more'."
+                ]
+                
+                technical_competence = [
+                    "I love how Aaron makes complex topics sound... confusing.",
+                    "Aaron's technical depth is about as shallow as a puddle.",
+                    "I'm sure Aaron totally understands what he just said.",
+                    "Aaron's explaining this like he learned it five minutes ago.",
+                    "That's some cutting-edge technology there, Aaron... if this were 2010."
+                ]
             
             # Choose category based on recent history
             categories = [presentation_skills, content_quality, technical_competence]
@@ -460,21 +584,66 @@ Remember: You're sarcastic but not cruel. Your goal is to add humor to presentat
             response_text = random.choice(chosen_category)
             
         else:  # contextual
-            # Context-aware contextual responses
-            if any(word in context_lower for word in ['aws', 'cloud', 'lambda', 'ec2', 's3']):
-                responses = [
-                    "Ah yes, more AWS buzzword bingo.",
-                    "How... revolutionary. Another cloud service.",
-                    "Oh brilliant, more serverless magic.",
-                    "I'm sure this AWS service will solve everything."
-                ]
-            elif any(word in context_lower for word in ['ai', 'machine learning', 'ml', 'artificial']):
-                responses = [
-                    "Oh wonderful, more AI hype.",
-                    "Let me guess, it's 'powered by AI'?",
-                    "Ah yes, because everything needs AI these days.",
-                    "How... innovative. Another AI solution."
-                ]
+            # Context-aware contextual responses with slide content
+            combined_context = context_lower
+            if slide_data and slide_data.slide_content:
+                combined_context += " " + slide_content_lower
+            
+            if any(word in combined_context for word in ['aws', 'cloud', 'lambda', 'ec2', 's3']):
+                if slide_data and slide_data.slide_content:
+                    responses = [
+                        f"Ah yes, more AWS buzzword bingo on '{slide_data.slide_title}'.",
+                        f"How... revolutionary. Another cloud service explanation.",
+                        f"Oh brilliant, more serverless magic from Aaron.",
+                        f"I'm sure this AWS service will solve everything, according to '{slide_data.slide_title}'."
+                    ]
+                else:
+                    responses = [
+                        "Ah yes, more AWS buzzword bingo.",
+                        "How... revolutionary. Another cloud service.",
+                        "Oh brilliant, more serverless magic.",
+                        "I'm sure this AWS service will solve everything."
+                    ]
+            elif any(word in combined_context for word in ['ai', 'machine learning', 'ml', 'artificial']):
+                if slide_data and slide_data.slide_content:
+                    responses = [
+                        f"Oh wonderful, more AI hype on '{slide_data.slide_title}'.",
+                        f"Let me guess, '{slide_data.slide_title}' is 'powered by AI'?",
+                        f"Ah yes, because '{slide_data.slide_title}' needed AI too.",
+                        f"How... innovative. Another AI solution from Aaron."
+                    ]
+                else:
+                    responses = [
+                        "Oh wonderful, more AI hype.",
+                        "Let me guess, it's 'powered by AI'?",
+                        "Ah yes, because everything needs AI these days.",
+                        "How... innovative. Another AI solution."
+                    ]
+            elif slide_data and slide_data.slide_content:
+                # Use slide content for more specific contextual responses
+                if any(word in slide_content_lower for word in ['bullet', 'point', 'list']) or '•' in slide_data.slide_content or '-' in slide_data.slide_content:
+                    responses = [
+                        f"How... fascinating. More bullet points on '{slide_data.slide_title}'.",
+                        f"Truly groundbreaking work with those bullet points, Aaron.",
+                        f"Oh brilliant. More lists to confuse everyone.",
+                        f"I'm sure those bullet points made perfect sense to someone."
+                    ]
+                elif any(word in slide_content_lower for word in ['diagram', 'chart', 'graph']):
+                    responses = [
+                        f"How... fascinating. Another diagram to decipher.",
+                        f"Truly groundbreaking visual work on '{slide_data.slide_title}', Aaron.",
+                        f"Oh brilliant. That chart really clarifies everything.",
+                        f"I'm sure that diagram made perfect sense to someone."
+                    ]
+                else:
+                    responses = [
+                        f"How... fascinating work on '{slide_data.slide_title}'.",
+                        f"Truly groundbreaking content here, Aaron.",
+                        f"Oh brilliant. Just brilliant presentation of '{slide_data.slide_title}'.",
+                        f"I'm sure '{slide_data.slide_title}' made perfect sense to someone.",
+                        f"Absolutely riveting stuff on this slide.",
+                        f"Well, '{slide_data.slide_title}' is certainly... something."
+                    ]
             else:
                 responses = [
                     "How... fascinating.",
@@ -553,13 +722,25 @@ Remember: You're sarcastic but not cruel. Your goal is to add humor to presentat
     @tool(description="Analyze slide content and generate contextual sarcastic commentary")
     async def analyze_slide_content(self, slide_title: str, slide_content: str = "", speaker_notes: str = "") -> Dict[str, Any]:
         """Analyze slide content and generate appropriate sarcastic commentary."""
+        from datetime import datetime
+        
         context = f"Slide '{slide_title}'"
         if slide_content:
             context += f" with content about {slide_content[:50]}"
         if speaker_notes and "[Orik]" not in speaker_notes:
             context += f" and notes: {speaker_notes[:50]}"
         
-        return await self.generate_response(context, response_type="contextual")
+        # Create a SlideData object to pass slide content
+        slide_data = SlideData(
+            slide_index=0,  # Default index
+            slide_title=slide_title,
+            speaker_notes=speaker_notes,
+            slide_content=slide_content,
+            presentation_path="current",
+            timestamp=datetime.now()
+        )
+        
+        return await self.generate_response(context, slide_data=slide_data, response_type="contextual")
     
     @tool(description="Adjust Orik's personality settings for different presentation styles")
     def adjust_personality(self, sarcasm_level: float = None, interruption_frequency: float = None, aaron_dig_probability: float = None) -> Dict[str, Any]:
